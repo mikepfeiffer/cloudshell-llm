@@ -197,10 +197,10 @@ export default function App() {
         {entries.length === 0 && (
           <div className="text-center mt-16 space-y-2">
             <p className="text-slate-400">
-              Ask me to do anything in Azure — I'll generate and run the command.
+              Describe what you want to do in Azure — no commands needed.
             </p>
             <p className="text-slate-600 text-sm">
-              e.g. "list all my VMs" · "how many resource groups do I have?" · "create an Ubuntu VM in webservers"
+              e.g. "show me what's in my webservers resource group" · "how many VMs do I have and where are they?" · "create an Ubuntu VM in webservers"
             </p>
           </div>
         )}

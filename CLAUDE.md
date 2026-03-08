@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-CloudShell LLM is a web application that provides a natural language interface to Azure. Instead of memorizing CLI commands, users type what they want to do in plain English and the system translates their intent into valid Azure CLI commands (for display) and Azure Management REST API calls (for actual execution). Commands run directly against `management.azure.com` using the user's authenticated MSAL bearer token — no local tooling, no Cloud Shell session required.
+CloudShell LLM is a web application that provides a natural language interface to Azure. Users describe what they want to do in plain English and the system translates their intent directly into Azure Management REST API calls — no CLI commands, no syntax to memorize. Queries and operations run directly against `management.azure.com` using the user's authenticated MSAL bearer token — no local tooling, no Cloud Shell session required.
 
 The user authenticates via Microsoft Entra ID (Azure AD). Their security context (RBAC roles, conditional access policies) is inherited directly by the REST API calls, so permissions are enforced identically to native Azure tooling.
 
@@ -44,10 +44,10 @@ The user authenticates via Microsoft Entra ID (Azure AD). Their security context
 1. User authenticates with Entra ID via MSAL.js (PKCE flow). An access token scoped to `https://management.azure.com/.default` is obtained.
 2. On authentication, the frontend automatically calls `POST /api/shell/provision`, which fetches the user's subscription info from the Azure Management API and caches it server-side (no manual "connect" step).
 3. User types a natural language request. The backend sends it to Claude along with session context (subscription ID, resource group).
-4. Claude returns **two things**: an `az` CLI command (shown in the UI for transparency) and an Azure Management REST API spec (`rest_method`, `rest_url`, `rest_body`) for actual execution.
-5. The frontend displays the `az` command with a risk badge and prompts for user confirmation.
+4. Claude returns a plain-English action title, a description, and an Azure Management REST API spec (`rest_method`, `rest_url`, `rest_body`) for execution. No az CLI syntax is generated.
+5. The frontend displays the action description with a risk badge, and shows the REST endpoint for transparency. For modify/destructive operations, user confirmation is required.
 6. On approval, the backend executes the REST API call against `management.azure.com` using the user's bearer token. No local `az` CLI, no Cloud Shell WebSocket.
-7. Results are returned as formatted JSON, displayed in the UI, and appended to the conversation context.
+7. Results are returned as formatted JSON or streamed as a plain-English synthesis, and appended to the conversation context.
 
 ## Why Not Azure Cloud Shell?
 
@@ -107,11 +107,11 @@ The direct REST API approach is actually superior for this use case:
 ## LLM Integration (Claude API)
 
 ### What Claude Generates
-Claude returns a single JSON object containing both the display command and the execution spec:
+Claude returns a JSON object with a plain-English action title, a description, and the REST API execution spec:
 
 ```json
 {
-  "command": "az network nsg list --resource-group myRG -o table",
+  "command": "List NSGs in myRG resource group",
   "description": "Lists all network security groups in the 'myRG' resource group",
   "risk_level": "read",
   "rest_method": "GET",
@@ -119,6 +119,8 @@ Claude returns a single JSON object containing both the display command and the 
   "rest_body": null
 }
 ```
+
+The `command` field is a concise plain-English title shown in the UI — no az CLI syntax. The actual execution always uses `rest_method` + `rest_url` + `rest_body`.
 
 Or a clarification when intent is ambiguous:
 ```json
@@ -128,41 +130,14 @@ Or a clarification when intent is ambiguous:
 ### System Prompt Design
 
 The system prompt instructs Claude to:
-1. Generate a valid `az` CLI command for display (user transparency).
-2. Generate the equivalent Azure Management REST API spec for actual execution.
+1. Generate a concise plain-English action title (`command` field) — no CLI syntax.
+2. Generate the Azure Management REST API spec (`rest_method`, `rest_url`, `rest_body`) for actual execution.
 3. Use `{subscriptionId}` and `{resourceGroup}` as URL placeholders — the backend substitutes real values from the session store.
 4. Ask clarifying questions rather than guessing when intent is ambiguous.
 5. Classify commands by risk level: `read`, `modify`, or `destructive`.
 6. Never generate destructive operations without explicit user intent.
-
-```
-You are an Azure CLI assistant. Translate natural language into Azure CLI commands and their equivalent Azure Management REST API calls.
-
-Respond ONLY with a JSON object in this exact format:
-{
-  "command": "<az cli command for display>",
-  "description": "<one-line explanation>",
-  "risk_level": "read|modify|destructive",
-  "rest_method": "GET|POST|PUT|PATCH|DELETE",
-  "rest_url": "<full management.azure.com URL with api-version, use {subscriptionId} and {resourceGroup} as placeholders>",
-  "rest_body": <JSON body object or null>
-}
-
-If the request is ambiguous, respond ONLY with:
-{ "clarification": "<your question>" }
-
-Rules:
-- Never generate destructive operations unless explicitly requested.
-- Use {subscriptionId} and {resourceGroup} as URL placeholders.
-- Always include the correct api-version query parameter.
-- risk_level "destructive" = any DELETE or purge operation.
-- risk_level "modify" = POST/PUT/PATCH that creates or changes resources.
-- risk_level "read" = GET operations only.
-
-Current session context:
-- Active subscription: {{subscription_name}} ({{subscription_id}})
-- Default resource group: {{resource_group}} (if set)
-```
+7. Add `"synthesize": true` for aggregation/question queries so results are summarized conversationally.
+8. Use `type: "agent"` for multi-resource creation tasks that require dependency ordering.
 
 ### Model
 - `claude-sonnet-4-6` — speed/cost balance for interactive use
@@ -178,9 +153,9 @@ Current session context:
 
 | Risk Level    | Behavior                               | Examples                                         |
 |--------------|----------------------------------------|--------------------------------------------------|
-| `read`       | Execute after brief display            | `az vm list`, `az account show`                  |
-| `modify`     | Require explicit user approval         | `az vm start`, `az network nsg create`           |
-| `destructive`| Require typed confirmation             | `az group delete`, `az vm delete`                |
+| `read`       | Auto-executes (GET only)               | List VMs, show resource group, get storage account |
+| `modify`     | Require explicit user approval         | Start VM, create NSG, update app service         |
+| `destructive`| Require typed confirmation ("confirm") | Delete resource group, purge key vault           |
 
 ## REST API Execution
 
@@ -240,7 +215,7 @@ cloudshell-llm/
 │       ├── components/
 │       │   ├── LoginButton.tsx
 │       │   ├── ChatInput.tsx
-│       │   ├── CommandPreview.tsx # Shows az command + risk badge; approve/reject buttons
+│       │   ├── CommandPreview.tsx # Shows action description + REST endpoint + risk badge; approve/reject buttons
 │       │   ├── TerminalOutput.tsx # xterm.js wrapper for output display
 │       │   ├── SessionStatus.tsx  # Shows subscription name; auto-connects (no manual button)
 │       │   └── RiskBadge.tsx
@@ -266,7 +241,7 @@ cloudshell-llm/
 │       │   └── chat.ts           # POST /chat → LLM → command or clarification
 │       ├── services/
 │       │   ├── cloudShell.ts     # getSubscriptionInfo(), executeRestCall()
-│       │   ├── llm.ts            # Claude API; generates az command + REST spec; imports ShellSession from sessionStore
+│       │   ├── llm.ts            # Claude API; generates action title + REST spec; streaming synthesis generator
 │       │   └── sessionStore.ts   # In-memory Map<userId, ShellSession> (subscription context only, no WebSocket)
 │       └── types/
 │           └── index.ts          # AuthenticatedUser, AuthenticatedRequest
@@ -287,7 +262,7 @@ export interface ChatMessage {
 }
 
 export interface GeneratedCommand {
-  command: string;           // az CLI command — displayed to user for transparency
+  command: string;           // plain-English action title shown in the UI (e.g. "List VMs in dev")
   description: string;
   risk_level: 'read' | 'modify' | 'destructive';
   rest_method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';  // used for actual execution
@@ -326,7 +301,7 @@ Sends a natural language message to Claude and returns a generated command or cl
 ```json
 {
   "type": "command",
-  "command": "az vm list --resource-group dev -o table",
+  "command": "List VMs in dev resource group",
   "description": "Lists all virtual machines in the 'dev' resource group",
   "risk_level": "read",
   "rest_method": "GET",
@@ -419,8 +394,9 @@ Frontend at `http://localhost:5173` — all `/api` requests proxied to `:3001`.
 
 - **No `.js` extensions in server imports** — ts-node with CommonJS doesn't resolve them; use bare relative paths.
 - **SWC not Babel** — `@vitejs/plugin-react-swc` avoids the `Cannot redefine property: File` error on Node 20.6 caused by Babel.
-- **xterm CSS** — import `@xterm/xterm/css/xterm.css` in `main.tsx` before `./index.css`, not inside a CSS file (Tailwind's `@tailwind` directives must come first in CSS files).
 - **JWT audience** — validate against both `https://management.azure.com` and `https://management.azure.com/` (trailing slash varies by token issuer).
+- **remark-gfm** — all `<Markdown>` instances use `remarkPlugins={[remarkGfm]}` to render GFM tables, strikethrough, and other extended syntax.
+- **Streaming synthesis** — `/api/chat/synthesize` is an SSE endpoint; the client reads it via `ReadableStream` and appends tokens to the synthesis entry in real time.
 - **Auto-provision** — `App.tsx` calls `provision()` in a `useEffect` when `isAuthenticated` becomes true; `SessionStatus` shows a pulsing indicator while provisioning, then the subscription name when ready.
 - **ShellSession import** — `llm.ts` imports `ShellSession` from `./sessionStore`, not from `../types/index`.
 - **Conversation context** — command outputs (truncated to 500 chars) are appended to chat history so Claude can reference previous results (e.g., "stop the second one").
@@ -431,7 +407,6 @@ Frontend at `http://localhost:5173` — all `/api` requests proxied to `:3001`.
 - **Manual E2E**: Test with a real Azure subscription (use a sandbox subscription with limited resources).
 
 ## Future Enhancements (Out of Scope for MVP)
-- Streaming output display.
 - Multi-subscription switching within a session.
 - Default resource group selection in UI.
 - Command history search and replay.

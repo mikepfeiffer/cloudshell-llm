@@ -92,7 +92,6 @@ export function AgentView({ description, steps, summary, clarify, error }: Props
 
                   <div className="flex-1 min-w-0">
                     <p className="text-slate-200 text-sm">{step.description}</p>
-                    <p className="text-slate-500 text-xs font-mono mt-0.5 truncate">{step.command}</p>
 
                     {step.status === 'error' && step.error && (
                       <p className="text-red-400 text-xs mt-1">{step.error}</p>

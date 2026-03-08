@@ -5,12 +5,15 @@ interface Props {
   command: string;
   description: string;
   risk_level: 'read' | 'modify' | 'destructive';
+  rest_method?: string;
+  rest_url?: string;
   onApprove: () => void;
   onReject: () => void;
   executing?: boolean;
+  [key: string]: unknown;
 }
 
-export function CommandPreview({ command, description, risk_level, onApprove, onReject, executing }: Props) {
+export function CommandPreview({ command, description, risk_level, rest_method, rest_url, onApprove, onReject, executing }: Props) {
   const [confirmText, setConfirmText] = useState('');
   const requiresTypedConfirm = risk_level === 'destructive';
   const confirmPhrase = 'confirm';
@@ -32,9 +35,16 @@ export function CommandPreview({ command, description, risk_level, onApprove, on
         <RiskBadge level={risk_level} />
       </div>
 
-      <pre className="bg-slate-900 rounded p-3 text-sm text-green-400 font-mono overflow-x-auto">
-        {command}
-      </pre>
+      {rest_method && rest_url && (
+        <div className="flex items-start gap-2 bg-slate-900 rounded px-3 py-2 overflow-hidden">
+          <span className={`shrink-0 text-xs font-mono font-semibold px-1.5 py-0.5 rounded ${
+            rest_method === 'GET' ? 'text-green-400 bg-green-950/60' :
+            rest_method === 'DELETE' ? 'text-red-400 bg-red-950/60' :
+            'text-yellow-400 bg-yellow-950/60'
+          }`}>{rest_method}</span>
+          <code className="text-xs text-slate-400 font-mono break-all leading-relaxed">{rest_url}</code>
+        </div>
+      )}
 
       {requiresTypedConfirm && (
         <div className="space-y-1">

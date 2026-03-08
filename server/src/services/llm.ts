@@ -17,8 +17,8 @@ function buildSystemPrompt(session: ShellSession | undefined): string {
 Rules:
 1. Respond ONLY with a JSON object in this exact format:
    {
-     "command": "<the equivalent az CLI command, for display only>",
-     "description": "<one-line explanation of what this does>",
+     "command": "<concise plain-English action title, e.g. 'List VMs in dev resource group', 'Create storage account mystore'>",
+     "description": "<one-line explanation of what this does and why>",
      "risk_level": "read|modify|destructive",
      "rest_method": "GET|POST|PUT|PATCH|DELETE",
      "rest_url": "https://management.azure.com/...",
@@ -74,7 +74,7 @@ Rules:
      "synthesize": true,
      "steps": [
        {
-         "command": "<az cli command for display>",
+         "command": "<concise plain-English label for this step>",
          "description": "<what this step does>",
          "rest_method": "GET|POST|PUT|PATCH|DELETE",
          "rest_url": "https://management.azure.com/...",

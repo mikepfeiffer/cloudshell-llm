@@ -1,6 +1,6 @@
 # CloudShell LLM
 
-A natural language interface for managing Azure resources. Type what you want to do in plain English — the app translates your intent into Azure Management REST API calls, executes them using your own Azure identity, and returns formatted results.
+A natural language interface for managing Azure resources. Describe what you want to do in plain English — no commands, no syntax, no CLI knowledge required. The app translates your intent into Azure Management REST API calls, executes them using your own Azure identity, and returns conversational results.
 
 ![CloudShell LLM](https://img.shields.io/badge/Azure-Management_API-0078d4?style=flat&logo=microsoftazure) ![Claude](https://img.shields.io/badge/Anthropic-Claude-black?style=flat) ![React](https://img.shields.io/badge/React-TypeScript-61dafb?style=flat&logo=react)
 
@@ -9,19 +9,20 @@ A natural language interface for managing Azure resources. Type what you want to
 1. You authenticate with your Microsoft Entra ID (Azure AD) account via the browser
 2. You type a natural language request: *"create an Ubuntu VM named WEB1 in the webservers resource group"*
 3. Claude classifies your request and chooses the right execution mode:
-   - **Simple command** — a single Azure REST API call (e.g. list VMs, show a resource group)
+   - **Direct query** — a single Azure REST API call (e.g. list VMs, show a resource group)
    - **Synthesized query** — a query where the result is summarized in plain English (e.g. "how many resource groups do I have?")
    - **Agent** — a multi-step task where dependencies must be checked and created in the correct order (e.g. VM creation, AKS deployment)
-4. Commands execute using **your Azure access token** — your RBAC roles and permissions apply exactly as they would in the Azure Portal
+4. Queries execute using **your Azure access token** — your RBAC roles and permissions apply exactly as they would in the Azure Portal
 
 ## Features
 
-- **Natural language to Azure REST API** — no memorizing `az` commands
+- **Natural language to Azure REST API** — describe what you want, not how to do it
+- **Streaming responses** — synthesis answers stream token-by-token as Claude generates them
 - **Agentic resource creation** — the agent checks what exists, creates prerequisites in order (VNet → subnet → NIC → VM), waits for each async operation to complete, and uses real resource IDs between steps
 - **Conversational synthesis** — aggregation queries return plain-English summaries ("You have 7 resource groups across 3 regions")
-- **Tabbed output** — Summary view with key resource properties, JSON tab for raw API responses
+- **Raw data access** — every synthesized response includes a collapsible JSON view of the underlying API data
 - **Async operation tracking** — long-running operations (storage accounts, VMs) show a live provisioning status indicator
-- **Destructive command protection** — delete/purge operations always require explicit confirmation regardless of settings
+- **Destructive command protection** — delete/purge operations always require explicit typed confirmation
 - **Your identity, your permissions** — the backend never injects its own credentials; all API calls use your delegated access token
 
 ## Architecture
@@ -32,9 +33,9 @@ Browser (React + MSAL.js)
     │  HTTPS
     ▼
 Node.js / Express (Azure App Service)
-    ├── /api/chat      — LLM classification (Claude)
-    ├── /api/agent/run — Agentic loop with SSE streaming
-    └── /api/shell/*   — Azure Management REST API proxy
+    ├── /api/chat          — LLM classification + streaming synthesis (Claude)
+    ├── /api/agent/run     — Agentic loop with SSE streaming
+    └── /api/shell/*       — Azure Management REST API proxy
     │
     ├── Anthropic Claude API
     └── Azure Management API (management.azure.com)
@@ -118,18 +119,18 @@ cloudshell-llm/
 │       ├── components/
 │       │   ├── AgentView.tsx    # Live step-by-step agent progress
 │       │   ├── ChatInput.tsx
-│       │   ├── CommandPreview.tsx
-│       │   ├── OutputView.tsx   # Tabbed Summary / JSON output
+│       │   ├── CommandPreview.tsx   # Action description + REST endpoint display
+│       │   ├── OutputView.tsx   # Raw JSON output view
 │       │   ├── PlanPreview.tsx
 │       │   ├── ProvisioningTracker.tsx  # Async operation polling UI
 │       │   ├── SessionStatus.tsx
-│       │   └── SynthesisView.tsx
+│       │   └── SynthesisView.tsx    # Streaming markdown response + raw data toggle
 │       ├── hooks/
 │       │   ├── useAuth.ts       # MSAL authentication
-│       │   ├── useChat.ts       # Chat history + agent stream handling
+│       │   ├── useChat.ts       # Chat history + agent/synthesis stream handling
 │       │   └── useCloudShell.ts # Azure REST API execution
 │       ├── services/
-│       │   └── api.ts           # HTTP + SSE client
+│       │   └── api.ts           # HTTP + SSE client (agent stream, synthesis stream)
 │       └── config/
 │           └── appConfig.ts     # Static config (confirmation toggle)
 │
@@ -140,12 +141,12 @@ cloudshell-llm/
 │       │   └── rateLimit.ts
 │       ├── routes/
 │       │   ├── agent.ts         # POST /api/agent/run (SSE)
-│       │   ├── chat.ts          # POST /api/chat, /api/chat/synthesize
+│       │   ├── chat.ts          # POST /api/chat, POST /api/chat/synthesize (SSE)
 │       │   └── shell.ts         # POST /api/shell/execute, /poll, etc.
 │       └── services/
 │           ├── agent.ts         # Agentic loop (async generator)
 │           ├── cloudShell.ts    # Azure REST API client + async polling
-│           ├── llm.ts           # Claude integration + system prompts
+│           ├── llm.ts           # Claude integration + streaming synthesis
 │           └── sessionStore.ts  # In-memory session state per user
 │
 └── shared/
@@ -174,7 +175,7 @@ export const appConfig = {
 };
 ```
 
-When `requireConfirmation` is `false`, read and modify commands auto-execute. Destructive commands (DELETE, purge) always require explicit confirmation regardless of this setting.
+When `requireConfirmation` is `false`, read and modify commands auto-execute. Destructive commands (DELETE, purge) always require explicit typed confirmation regardless of this setting.
 
 ## Security Notes
 

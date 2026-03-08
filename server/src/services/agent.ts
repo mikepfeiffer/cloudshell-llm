@@ -47,7 +47,7 @@ At each turn you receive the original goal and a history of steps already execut
 ACTIONS:
 
 1. Execute a REST call:
-{"action":"execute","description":"<shown to user>","command":"<az CLI equivalent, display only>","rest_method":"GET|POST|PUT|PATCH|DELETE","rest_url":"https://management.azure.com/...","rest_body":{}}
+{"action":"execute","description":"<shown to user>","command":"<concise plain-English label, e.g. 'Check if VNet exists', 'Create NIC WEB1-nic'>","rest_method":"GET|POST|PUT|PATCH|DELETE","rest_url":"https://management.azure.com/...","rest_body":{}}
 
 2. Request clarification from the user:
 {"action":"clarify","message":"<your question>"}

@@ -35,7 +35,6 @@ export function PlanPreview({ description, risk_level, steps, onApprove, onRejec
             </span>
             <div className="min-w-0">
               <p className="text-slate-300 text-sm">{step.description}</p>
-              <code className="text-xs text-slate-500 font-mono break-all">{step.command}</code>
             </div>
           </li>
         ))}
