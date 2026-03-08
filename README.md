@@ -222,3 +222,9 @@ User settings are available via the gear icon in the top-right corner and are pe
 - All Azure API calls use the user's delegated token; the server has no Azure credentials of its own
 - The poll endpoint only accepts `management.azure.com` URLs to prevent SSRF
 - Rate limiting is applied per user on all shell and chat endpoints
+
+## Open Source Notice
+
+This project is released under the [MIT License](./LICENSE).
+
+It is provided for educational and development use, without warranty of any kind, and should be validated and security-reviewed before production use.
