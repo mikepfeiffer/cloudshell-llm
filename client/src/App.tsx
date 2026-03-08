@@ -9,10 +9,11 @@ import { SynthesisView } from './components/SynthesisView';
 import { ProvisioningTracker } from './components/ProvisioningTracker';
 import { AgentView } from './components/AgentView';
 import { SessionStatus } from './components/SessionStatus';
+import { SettingsMenu } from './components/SettingsMenu';
 import { useAuth } from './hooks/useAuth';
 import { useChat, ChatEntry } from './hooks/useChat';
 import { useCloudShell } from './hooks/useCloudShell';
-import { appConfig } from './config/appConfig';
+import { useSettings } from './hooks/useSettings';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
@@ -55,20 +56,22 @@ export default function App() {
   const { account, logout, getToken } = useAuth();
   const { entries, loading, sendMessage, addOutput, addProvisioning, addStreamingSynthesis, addError, clearHistory } = useChat();
   const { sessionState, provisioning, error: shellError, provision, execute } = useCloudShell();
+  const { settings, loadSettings, saveSettings } = useSettings();
   const [executingId, setExecutingId] = useState<string | null>(null);
   const autoExecutedRef = useRef<Set<string>>(new Set());
 
-  // Auto-initialize session as soon as the user is authenticated
+  // Auto-initialize session and load settings as soon as the user is authenticated
   useEffect(() => {
     if (isAuthenticated && !sessionState.isConnected && !provisioning) {
       provision();
+      getToken().then(loadSettings).catch(() => {});
     }
   }, [isAuthenticated]);
 
   // Auto-approve commands/plans when confirmation is disabled.
   // Destructive commands always require explicit confirmation.
   useEffect(() => {
-    if (appConfig.requireConfirmation) return;
+    if (settings.requireConfirmation) return;
     if (executingId) return;
 
     const last = entries[entries.length - 1];
@@ -93,7 +96,8 @@ export default function App() {
   const handleApprove = async (entry: ChatEntry) => {
     if (!entry.pendingCommand) return;
     setExecutingId(entry.id);
-    const { rest_method, rest_url, rest_body, command, description, synthesize } = entry.pendingCommand;
+    const { rest_method, rest_url, rest_body, command, description } = entry.pendingCommand;
+    const synthesize = entry.pendingCommand.synthesize || settings.alwaysSynthesize;
 
     try {
       const { output, pollUrl } = await execute(rest_method, rest_url, rest_body);
@@ -170,12 +174,19 @@ export default function App() {
       {/* Header */}
       <header className="flex items-center justify-between px-6 py-3 border-b border-slate-800">
         <h1 className="text-white font-semibold">CloudShell LLM</h1>
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-5">
           <SessionStatus
             session={sessionState}
             provisioning={provisioning}
           />
           <span className="text-slate-400 text-sm">{account?.name ?? account?.username}</span>
+          <SettingsMenu
+            settings={settings}
+            onSave={async (updates) => {
+              const token = await getToken();
+              await saveSettings(token, updates);
+            }}
+          />
           <button
             onClick={logout}
             className="text-slate-500 hover:text-slate-300 text-sm transition-colors"
@@ -210,7 +221,7 @@ export default function App() {
             key={entry.id}
             entry={entry}
             executing={executingId === entry.id}
-            requireConfirmation={appConfig.requireConfirmation}
+            requireConfirmation={settings.requireConfirmation}
             onApprove={() => handleApprove(entry)}
             onApprovePlan={() => handleApprovePlan(entry)}
             onReject={() => {/* dismissed silently */}}

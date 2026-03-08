@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import { AuthenticatedRequest } from '../types/index';
 import { getSubscriptionInfo, executeRestCall, pollAsyncOperation } from '../services/cloudShell';
 import { getSession, setSession, deleteSession } from '../services/sessionStore';
+import { getUserSettings } from '../services/settingsStore';
 import { shellRateLimit } from '../middleware/rateLimit';
 
 const router = Router();
@@ -19,14 +20,17 @@ router.post('/provision', shellRateLimit, async (req: AuthenticatedRequest, res:
 
   try {
     const subInfo = await getSubscriptionInfo(accessToken);
+    const settings = getUserSettings(userId);
     setSession(userId, {
       subscriptionId: subInfo?.subscriptionId,
       subscriptionName: subInfo?.subscriptionName,
+      defaultResourceGroup: settings.defaultResourceGroup || undefined,
     });
     res.json({
       status: 'connected',
       subscriptionId: subInfo?.subscriptionId,
       subscriptionName: subInfo?.subscriptionName,
+      defaultResourceGroup: settings.defaultResourceGroup || undefined,
     });
   } catch (err) {
     console.error('Provision error:', err);

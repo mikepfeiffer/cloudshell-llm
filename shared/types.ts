@@ -64,3 +64,9 @@ export interface SessionState {
   subscriptionId?: string;
   defaultResourceGroup?: string;
 }
+
+export interface UserSettings {
+  requireConfirmation: boolean;
+  defaultResourceGroup: string;
+  alwaysSynthesize: boolean;
+}

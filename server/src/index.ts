@@ -5,6 +5,7 @@ import { requireAuth } from './middleware/auth';
 import chatRouter from './routes/chat';
 import shellRouter from './routes/shell';
 import agentRouter from './routes/agent';
+import settingsRouter from './routes/settings';
 import { AuthenticatedRequest } from './types/index';
 
 const app = express();
@@ -24,6 +25,7 @@ app.use('/api', requireAuth as express.RequestHandler);
 app.use('/api/chat', chatRouter);
 app.use('/api/shell', shellRouter);
 app.use('/api/agent', agentRouter);
+app.use('/api/settings', settingsRouter);
 
 app.get('/api/me', (req: AuthenticatedRequest, res) => {
   res.json({ user: req.user });

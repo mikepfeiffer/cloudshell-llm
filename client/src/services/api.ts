@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { ChatMessage } from '../types/index';
+import { UserSettings } from '../../../shared/types';
 
 export type AgentEvent =
   | { type: 'step_start'; stepIndex: number; description: string; command: string }
@@ -172,5 +173,15 @@ export async function pollOperation(token: string, url: string) {
     status: 'InProgress' | 'Succeeded' | 'Failed' | 'Canceled';
     error?: string;
   };
+}
+
+export async function getSettings(token: string): Promise<UserSettings> {
+  const { data } = await makeClient(token).get('/settings');
+  return data as UserSettings;
+}
+
+export async function updateSettings(token: string, updates: Partial<UserSettings>): Promise<UserSettings> {
+  const { data } = await makeClient(token).post('/settings', updates);
+  return data as UserSettings;
 }
 
