@@ -166,28 +166,38 @@ export async function generateCommand(
   return { clarification: 'I could not generate a valid command. Could you rephrase your request?' };
 }
 
-export async function synthesizeResults(
+const SYNTHESIS_SYSTEM =
+  'You are a helpful Azure assistant. The user asked a question, Azure API calls were executed, and you must summarize the results conversationally. Be concise and direct. Answer the question first, then provide relevant details. Use markdown for formatting when it helps readability. Write in a friendly, informative tone.';
+
+function buildSynthesisMessages(
   originalQuestion: string,
   results: Array<{ command: string; output: string }>
-): Promise<string> {
+): Anthropic.MessageParam[] {
   const resultsText = results
     .map(({ command, output }) => `Command: ${command}\nOutput:\n${output.slice(0, 20000)}`)
     .join('\n\n---\n\n');
+  return [
+    {
+      role: 'user',
+      content: `The user asked: "${originalQuestion}"\n\nHere are the Azure API results:\n\n${resultsText}\n\nAnswer the user's question conversationally based on these results.`,
+    },
+  ];
+}
 
-  const response = await client.messages.create({
+export async function* streamSynthesisTokens(
+  originalQuestion: string,
+  results: Array<{ command: string; output: string }>
+): AsyncGenerator<string> {
+  const stream = client.messages.stream({
     model: 'claude-sonnet-4-6',
     max_tokens: 1024,
-    system:
-      'You are a helpful Azure assistant. The user asked a question, Azure API calls were executed, and you must summarize the results conversationally. Be concise and direct. Answer the question first, then provide relevant details. Use plain text — no JSON, no markdown code blocks, no bullet points unless listing items naturally. Write in a friendly, informative tone.',
-    messages: [
-      {
-        role: 'user',
-        content: `The user asked: "${originalQuestion}"\n\nHere are the Azure API results:\n\n${resultsText}\n\nAnswer the user's question conversationally based on these results.`,
-      },
-    ],
+    system: SYNTHESIS_SYSTEM,
+    messages: buildSynthesisMessages(originalQuestion, results),
   });
 
-  return response.content[0].type === 'text'
-    ? response.content[0].text
-    : 'I was unable to summarize the results.';
+  for await (const event of stream) {
+    if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
+      yield event.delta.text;
+    }
+  }
 }

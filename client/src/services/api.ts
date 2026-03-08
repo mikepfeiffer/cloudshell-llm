@@ -9,6 +9,46 @@ export type AgentEvent =
   | { type: 'clarify'; message: string }
   | { type: 'error'; message: string };
 
+export async function* streamSynthesis(
+  token: string,
+  question: string,
+  results: Array<{ command: string; output: string }>
+): AsyncGenerator<string> {
+  const response = await fetch('/api/chat/synthesize', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ question, results }),
+  });
+
+  if (!response.ok || !response.body) {
+    throw new Error(`Synthesis request failed: HTTP ${response.status}`);
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() ?? '';
+    for (const line of lines) {
+      if (line.startsWith('data: ')) {
+        try {
+          const data = JSON.parse(line.slice(6)) as { token?: string; done?: boolean; error?: string };
+          if (data.token) yield data.token;
+          if (data.done || data.error) return;
+        } catch { /* skip malformed */ }
+      }
+    }
+  }
+}
+
 const BASE = '/api';
 
 function makeClient(token: string) {
@@ -134,11 +174,3 @@ export async function pollOperation(token: string, url: string) {
   };
 }
 
-export async function synthesizeResults(
-  token: string,
-  question: string,
-  results: Array<{ command: string; output: string }>
-) {
-  const { data } = await makeClient(token).post('/chat/synthesize', { question, results });
-  return data as { message: string };
-}

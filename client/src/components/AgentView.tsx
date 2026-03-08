@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import Markdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { AgentStep } from '../../../shared/types';
 
 interface Props {
@@ -53,7 +54,7 @@ export function AgentView({ description, steps, summary, clarify, error }: Props
           prose-p:text-slate-300 prose-p:my-0.5
           prose-strong:text-white
           prose-ul:text-slate-300 prose-li:my-0">
-          <Markdown>{summary}</Markdown>
+          <Markdown remarkPlugins={[remarkGfm]}>{summary}</Markdown>
         </div>
       )}
 

@@ -1,6 +1,6 @@
 import { Router, Response } from 'express';
 import { AuthenticatedRequest } from '../types/index';
-import { generateCommand, synthesizeResults } from '../services/llm';
+import { generateCommand, streamSynthesisTokens } from '../services/llm';
 import { getSession } from '../services/sessionStore';
 import { chatRateLimit } from '../middleware/rateLimit';
 import { ChatMessage } from '../../../shared/types';
@@ -62,12 +62,23 @@ router.post('/synthesize', chatRateLimit, async (req: AuthenticatedRequest, res:
     return;
   }
 
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders();
+
+  const send = (data: object) => res.write(`data: ${JSON.stringify(data)}\n\n`);
+
   try {
-    const message = await synthesizeResults(question, results);
-    res.json({ message });
+    for await (const token of streamSynthesisTokens(question, results)) {
+      send({ token });
+    }
+    send({ done: true });
   } catch (err) {
     console.error('Synthesis error:', err);
-    res.status(500).json({ error: 'Failed to synthesize results.' });
+    send({ error: (err as Error).message });
+  } finally {
+    res.end();
   }
 });
 

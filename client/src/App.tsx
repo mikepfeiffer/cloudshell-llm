@@ -12,9 +12,9 @@ import { SessionStatus } from './components/SessionStatus';
 import { useAuth } from './hooks/useAuth';
 import { useChat, ChatEntry } from './hooks/useChat';
 import { useCloudShell } from './hooks/useCloudShell';
-import { synthesizeResults } from './services/api';
 import { appConfig } from './config/appConfig';
 import Markdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 const POLL_INTERVAL_MS = 4000;
 const MAX_POLLS = 75;
@@ -53,7 +53,7 @@ function getErrorMessage(err: unknown): string {
 export default function App() {
   const isAuthenticated = useIsAuthenticated();
   const { account, logout, getToken } = useAuth();
-  const { entries, loading, sendMessage, addOutput, addProvisioning, addSynthesis, addError, clearHistory } = useChat();
+  const { entries, loading, sendMessage, addOutput, addProvisioning, addStreamingSynthesis, addError, clearHistory } = useChat();
   const { sessionState, provisioning, error: shellError, provision, execute } = useCloudShell();
   const [executingId, setExecutingId] = useState<string | null>(null);
   const autoExecutedRef = useRef<Set<string>>(new Set());
@@ -110,9 +110,7 @@ export default function App() {
         const question = questionEntry?.content ?? command;
 
         try {
-          const token = await getToken();
-          const { message } = await synthesizeResults(token, question, [{ command, output }]);
-          addSynthesis(question, message, [{ command, output }]);
+          await addStreamingSynthesis(question, [{ command, output }]);
         } catch {
           addOutput(command, output);
         }
@@ -153,9 +151,7 @@ export default function App() {
       }
 
       try {
-        const token = await getToken();
-        const { message } = await synthesizeResults(token, question, results);
-        addSynthesis(question, message, results);
+        await addStreamingSynthesis(question, results);
       } catch {
         // Synthesis failed — show each step's raw output
         for (const r of results) {
@@ -280,7 +276,7 @@ function EntryView({
           prose-p:text-slate-300 prose-p:my-0.5
           prose-strong:text-white
           prose-code:text-blue-300 prose-code:bg-slate-900 prose-code:px-1 prose-code:rounded prose-code:text-xs">
-          <Markdown>{entry.content}</Markdown>
+          <Markdown remarkPlugins={[remarkGfm]}>{entry.content}</Markdown>
         </div>
       </div>
     );
@@ -347,10 +343,14 @@ function EntryView({
     );
   }
 
-  if (entry.type === 'synthesis' && entry.synthesisMessage && entry.results) {
+  if (entry.type === 'synthesis' && entry.results) {
     return (
       <div className="max-w-2xl">
-        <SynthesisView message={entry.synthesisMessage} results={entry.results} />
+        <SynthesisView
+          message={entry.synthesisMessage ?? ''}
+          isStreaming={entry.isStreaming}
+          results={entry.results}
+        />
       </div>
     );
   }

@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useAuth } from './useAuth';
-import { sendChatMessage, runAgent } from '../services/api';
+import { sendChatMessage, runAgent, streamSynthesis } from '../services/api';
 import { ChatMessage } from '../types/index';
 import { AgentStep } from '../../../shared/types';
 
@@ -35,6 +35,7 @@ export interface ChatEntry {
   };
   // For synthesis entries
   synthesisMessage?: string;
+  isStreaming?: boolean;
   results?: Array<{ command: string; output: string }>;
   // For agent entries
   agentSteps?: AgentStep[];
@@ -183,17 +184,39 @@ export function useChat() {
     addEntry({ type: 'provisioning', content: description, pollUrl });
   }, []);
 
-  const addSynthesis = useCallback((
+  const addStreamingSynthesis = useCallback(async (
     question: string,
-    message: string,
     results: Array<{ command: string; output: string }>
   ) => {
-    addEntry({ type: 'synthesis', content: message, synthesisMessage: message, results });
-    setHistory((prev) => [
-      ...prev,
-      { role: 'assistant', content: message, timestamp: Date.now() },
-    ]);
-  }, []);
+    const entryId = crypto.randomUUID();
+    setEntries((prev) => [...prev, {
+      id: entryId,
+      type: 'synthesis',
+      content: '',
+      synthesisMessage: '',
+      isStreaming: true,
+      results,
+      timestamp: Date.now(),
+    }]);
+
+    const token = await getToken();
+    let fullMessage = '';
+    try {
+      for await (const tok of streamSynthesis(token, question, results)) {
+        fullMessage += tok;
+        setEntries((prev) => prev.map((e) =>
+          e.id === entryId ? { ...e, synthesisMessage: fullMessage, content: fullMessage } : e
+        ));
+      }
+    } finally {
+      setEntries((prev) => prev.map((e) =>
+        e.id === entryId ? { ...e, isStreaming: false } : e
+      ));
+      if (fullMessage) {
+        setHistory((prev) => [...prev, { role: 'assistant', content: fullMessage, timestamp: Date.now() }]);
+      }
+    }
+  }, [getToken]);
 
   const addError = useCallback((msg: string) => {
     addEntry({ type: 'error', content: msg });
@@ -204,5 +227,5 @@ export function useChat() {
     setHistory([]);
   }, []);
 
-  return { entries, loading, sendMessage, addOutput, addProvisioning, addSynthesis, addError, clearHistory };
+  return { entries, loading, sendMessage, addOutput, addProvisioning, addStreamingSynthesis, addError, clearHistory };
 }
