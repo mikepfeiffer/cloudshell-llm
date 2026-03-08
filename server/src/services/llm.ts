@@ -1,8 +1,6 @@
-import Anthropic from '@anthropic-ai/sdk';
 import { ChatMessage, LLMResponse, PlanStep, AgentGoal } from '../../../shared/types';
 import { ShellSession } from './sessionStore';
-
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+import { ProviderConfig, completeText, streamText } from './llmProvider';
 
 const MAX_HISTORY = 15;
 
@@ -97,25 +95,19 @@ Current session context:
 export async function generateCommand(
   message: string,
   history: ChatMessage[],
-  session: ShellSession | undefined
+  session: ShellSession | undefined,
+  providerConfig: ProviderConfig
 ): Promise<LLMResponse | AgentGoal> {
   const systemPrompt = buildSystemPrompt(session);
   const recentHistory = history.slice(-MAX_HISTORY);
 
-  const messages: Anthropic.MessageParam[] = recentHistory.map((msg) => ({
+  const messages: Array<{ role: 'user' | 'assistant'; content: string }> = recentHistory.map((msg) => ({
     role: msg.role === 'user' ? 'user' : 'assistant',
     content: msg.content,
   }));
   messages.push({ role: 'user', content: message });
 
-  const response = await client.messages.create({
-    model: 'claude-sonnet-4-6',
-    max_tokens: 1024,
-    system: systemPrompt,
-    messages,
-  });
-
-  const text = response.content[0].type === 'text' ? response.content[0].text : '';
+  const text = await completeText(providerConfig, systemPrompt, messages, 1024);
 
   const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/) ?? text.match(/(\{[\s\S]*\})/);
 
@@ -172,7 +164,7 @@ const SYNTHESIS_SYSTEM =
 function buildSynthesisMessages(
   originalQuestion: string,
   results: Array<{ command: string; output: string }>
-): Anthropic.MessageParam[] {
+): Array<{ role: 'user'; content: string }> {
   const resultsText = results
     .map(({ command, output }) => `Command: ${command}\nOutput:\n${output.slice(0, 20000)}`)
     .join('\n\n---\n\n');
@@ -186,18 +178,15 @@ function buildSynthesisMessages(
 
 export async function* streamSynthesisTokens(
   originalQuestion: string,
-  results: Array<{ command: string; output: string }>
+  results: Array<{ command: string; output: string }>,
+  providerConfig: ProviderConfig
 ): AsyncGenerator<string> {
-  const stream = client.messages.stream({
-    model: 'claude-sonnet-4-6',
-    max_tokens: 1024,
-    system: SYNTHESIS_SYSTEM,
-    messages: buildSynthesisMessages(originalQuestion, results),
-  });
-
-  for await (const event of stream) {
-    if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
-      yield event.delta.text;
-    }
+  for await (const token of streamText(
+    providerConfig,
+    SYNTHESIS_SYSTEM,
+    buildSynthesisMessages(originalQuestion, results),
+    1024
+  )) {
+    yield token;
   }
 }

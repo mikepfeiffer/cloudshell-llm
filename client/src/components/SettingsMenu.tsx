@@ -1,5 +1,10 @@
 import { useState } from 'react';
-import { UserSettings } from '../../../shared/types';
+import {
+  DEFAULT_LLM_MODEL_BY_PROVIDER,
+  LLM_PROVIDER_MODELS,
+  LlmProvider,
+  UserSettings,
+} from '../../../shared/types';
 
 interface Props {
   settings: UserSettings;
@@ -18,6 +23,7 @@ export function SettingsMenu({ settings, onSave }: Props) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<UserSettings>(settings);
   const [saving, setSaving] = useState(false);
+  const modelOptions = LLM_PROVIDER_MODELS[draft.llmProvider];
 
   const handleOpen = () => {
     setDraft(settings); // reset draft to current saved settings
@@ -87,6 +93,44 @@ export function SettingsMenu({ settings, onSave }: Props) {
                 placeholder="e.g. my-resource-group"
                 className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-blue-500 transition-colors"
               />
+            </div>
+
+            {/* LLM provider */}
+            <div className="space-y-1.5">
+              <label className="text-slate-200 text-sm font-medium block">LLM provider</label>
+              <p className="text-slate-500 text-xs">Choose which model API powers command generation, synthesis, and agent steps.</p>
+              <select
+                value={draft.llmProvider}
+                onChange={(e) => {
+                  const provider = e.target.value as LlmProvider;
+                  setDraft((d) => ({
+                    ...d,
+                    llmProvider: provider,
+                    llmModel: DEFAULT_LLM_MODEL_BY_PROVIDER[provider],
+                  }));
+                }}
+                className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500 transition-colors"
+              >
+                <option value="claude">Claude</option>
+                <option value="openai">ChatGPT</option>
+              </select>
+            </div>
+
+            {/* LLM model */}
+            <div className="space-y-1.5">
+              <label className="text-slate-200 text-sm font-medium block">Model</label>
+              <p className="text-slate-500 text-xs">Available models depend on the selected provider.</p>
+              <select
+                value={draft.llmModel}
+                onChange={(e) => setDraft((d) => ({ ...d, llmModel: e.target.value }))}
+                className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500 transition-colors"
+              >
+                {modelOptions.map((model) => (
+                  <option key={model} value={model}>
+                    {model}
+                  </option>
+                ))}
+              </select>
             </div>
 
             {/* Actions */}

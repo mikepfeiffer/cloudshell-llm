@@ -1,8 +1,6 @@
-import Anthropic from '@anthropic-ai/sdk';
 import { ShellSession } from './sessionStore';
 import { executeRestCall, pollAsyncOperation } from './cloudShell';
-
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+import { ProviderConfig, completeText } from './llmProvider';
 
 const MAX_STEPS = 12;
 const MAX_CONSECUTIVE_ERRORS = 3;
@@ -88,11 +86,12 @@ export async function* runAgentLoop(
   goal: string,
   session: ShellSession | undefined,
   accessToken: string,
+  providerConfig: ProviderConfig,
   signal?: AbortSignal
 ): AsyncGenerator<AgentEvent> {
   const systemPrompt = buildSystemPrompt(session);
   const stepHistory: StepRecord[] = [];
-  const messages: Anthropic.MessageParam[] = [];
+  const messages: Array<{ role: 'user' | 'assistant'; content: string }> = [];
   let consecutiveErrors = 0;
 
   for (let stepIndex = 0; stepIndex < MAX_STEPS; stepIndex++) {
@@ -115,14 +114,7 @@ export async function* runAgentLoop(
       content: `Goal: ${goal}\n\nStep history:\n${historyText}\n\nWhat is the next action?`,
     });
 
-    const response = await client.messages.create({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 1024,
-      system: systemPrompt,
-      messages,
-    });
-
-    const text = response.content[0].type === 'text' ? response.content[0].text : '';
+    const text = await completeText(providerConfig, systemPrompt, messages, 1024);
     messages.push({ role: 'assistant', content: text });
 
     // Extract JSON: prefer fenced code block, otherwise find outermost { ... }

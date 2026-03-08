@@ -3,6 +3,8 @@ import { AuthenticatedRequest } from '../types/index';
 import { runAgentLoop } from '../services/agent';
 import { getSession } from '../services/sessionStore';
 import { shellRateLimit } from '../middleware/rateLimit';
+import { getUserSettings } from '../services/settingsStore';
+import { InvalidProviderModelError, MissingProviderApiKeyError } from '../services/llmProvider';
 
 const router = Router();
 
@@ -16,6 +18,8 @@ router.post('/run', shellRateLimit, async (req: AuthenticatedRequest, res: Respo
 
   const userId = req.user!.oid;
   const session = getSession(userId);
+  const settings = getUserSettings(userId);
+  const providerConfig = { provider: settings.llmProvider, model: settings.llmModel } as const;
   if (!session) {
     res.status(400).json({ error: 'No active session. Please refresh the page.' });
     return;
@@ -32,12 +36,16 @@ router.post('/run', shellRateLimit, async (req: AuthenticatedRequest, res: Respo
   req.on('close', () => abort.abort());
 
   try {
-    for await (const event of runAgentLoop(goal, session, req.user!.accessToken, abort.signal)) {
+    for await (const event of runAgentLoop(goal, session, req.user!.accessToken, providerConfig, abort.signal)) {
       send(event);
       if (event.type === 'done' || event.type === 'error' || event.type === 'clarify') break;
     }
   } catch (err) {
-    send({ type: 'error', message: (err as Error).message });
+    if (err instanceof InvalidProviderModelError || err instanceof MissingProviderApiKeyError) {
+      send({ type: 'error', message: err.message });
+    } else {
+      send({ type: 'error', message: (err as Error).message });
+    }
   } finally {
     res.end();
   }

@@ -2,13 +2,13 @@
 
 A natural language interface for managing Azure resources. Describe what you want to do in plain English — no commands, no syntax, no CLI knowledge required. The app translates your intent into Azure Management REST API calls, executes them using your own Azure identity, and returns conversational results.
 
-![CloudShell LLM](https://img.shields.io/badge/Azure-Management_API-0078d4?style=flat&logo=microsoftazure) ![Claude](https://img.shields.io/badge/Anthropic-Claude-black?style=flat) ![React](https://img.shields.io/badge/React-TypeScript-61dafb?style=flat&logo=react)
+![CloudShell LLM](https://img.shields.io/badge/Azure-Management_API-0078d4?style=flat&logo=microsoftazure) ![LLM](https://img.shields.io/badge/LLM-Claude%20%7C%20ChatGPT-111?style=flat) ![OpenAI ChatGPT](https://img.shields.io/badge/OpenAI-ChatGPT-10a37f?style=flat&logo=openai&logoColor=white) ![React](https://img.shields.io/badge/React-TypeScript-61dafb?style=flat&logo=react)
 
 ## How It Works
 
 1. You authenticate with your Microsoft Entra ID (Azure AD) account via the browser
 2. You type a natural language request: *"create an Ubuntu VM named WEB1 in the webservers resource group"*
-3. Claude classifies your request and chooses the right execution mode:
+3. Your selected LLM provider (Claude or ChatGPT) classifies your request and chooses the right execution mode:
    - **Direct query** — a single Azure REST API call (e.g. list VMs, show a resource group)
    - **Synthesized query** — a query where the result is summarized in plain English (e.g. "how many resource groups do I have?")
    - **Agent** — a multi-step task where dependencies must be checked and created in the correct order (e.g. VM creation, AKS deployment)
@@ -17,7 +17,7 @@ A natural language interface for managing Azure resources. Describe what you wan
 ## Features
 
 - **Natural language to Azure REST API** — describe what you want, not how to do it
-- **Streaming responses** — synthesis answers stream token-by-token as Claude generates them
+- **Streaming responses** — synthesis answers stream token-by-token as the selected model generates them
 - **Agentic resource creation** — the agent checks what exists, creates prerequisites in order (VNet → subnet → NIC → VM), waits for each async operation to complete, and uses real resource IDs between steps
 - **Conversational synthesis** — aggregation queries return plain-English summaries ("You have 7 resource groups across 3 regions")
 - **Raw data access** — every synthesized response includes a collapsible JSON view of the underlying API data
@@ -33,11 +33,11 @@ Browser (React + MSAL.js)
     │  HTTPS
     ▼
 Node.js / Express (Azure App Service)
-    ├── /api/chat          — LLM classification + streaming synthesis (Claude)
+    ├── /api/chat          — LLM classification + streaming synthesis (Claude/OpenAI)
     ├── /api/agent/run     — Agentic loop with SSE streaming
     └── /api/shell/*       — Azure Management REST API proxy
     │
-    ├── Anthropic Claude API
+    ├── Anthropic Claude API or OpenAI API
     └── Azure Management API (management.azure.com)
          └── authenticated with the user's delegated token
 ```
@@ -51,7 +51,7 @@ The backend is a thin proxy — it validates your Entra ID token on every reques
 | Frontend | React 18, TypeScript, Vite, Tailwind CSS |
 | Auth | MSAL.js v2 (`@azure/msal-browser`) |
 | Backend | Node.js, Express, TypeScript |
-| LLM | Anthropic Claude (`claude-sonnet-4-6`) |
+| LLM | Anthropic Claude or OpenAI ChatGPT (user-selectable per settings) |
 | Azure API | Azure Management REST API (`management.azure.com`) |
 
 ## Prerequisites
@@ -59,7 +59,7 @@ The backend is a thin proxy — it validates your Entra ID token on every reques
 - Node.js 20+
 - An Azure subscription
 - An **Entra ID App Registration** configured as a SPA with `Azure Service Management` → `user_impersonation` permission
-- An Anthropic API key
+- An Anthropic API key and/or an OpenAI API key
 
 ## Setup
 
@@ -77,6 +77,7 @@ In the Azure Portal:
 **`server/.env`**
 ```
 ANTHROPIC_API_KEY=sk-ant-...
+OPENAI_API_KEY=sk-proj-...
 AZURE_CLIENT_ID=<your-app-registration-client-id>
 AZURE_TENANT_ID=<your-tenant-id>
 PORT=3001
@@ -146,7 +147,8 @@ cloudshell-llm/
 │       └── services/
 │           ├── agent.ts         # Agentic loop (async generator)
 │           ├── cloudShell.ts    # Azure REST API client + async polling
-│           ├── llm.ts           # Claude integration + streaming synthesis
+│           ├── llm.ts           # Provider-agnostic command generation + synthesis
+│           ├── llmProvider.ts   # Claude/OpenAI provider adapters + validation
 │           ├── sessionStore.ts  # In-memory session state per user
 │           └── settingsStore.ts # Per-user settings persistence (JSON file)
 │
@@ -158,11 +160,11 @@ cloudshell-llm/
 
 For complex tasks requiring multiple interdependent resources, the app uses an agentic loop rather than a pre-generated plan:
 
-1. Claude classifies the request as `type: "agent"` and passes the goal to the agent endpoint
-2. The agent calls Claude repeatedly in a loop: *"given the goal and what has happened so far, what is the next single API call?"*
-3. Each step's real output (including Azure resource IDs) is passed back to Claude before the next step — so the VM creation step can reference the actual NIC resource ID that was just created
-4. If a step fails, the error is passed back to Claude as context; it can attempt recovery (e.g. a 404 on a GET means the resource doesn't exist and needs to be created)
-5. When the goal is achieved, Claude responds with `action: "done"` and a plain-English summary
+1. The selected provider classifies the request as `type: "agent"` and passes the goal to the agent endpoint
+2. The agent calls the selected provider repeatedly in a loop: *"given the goal and what has happened so far, what is the next single API call?"*
+3. Each step's real output (including Azure resource IDs) is passed back to the model before the next step — so the VM creation step can reference the actual NIC resource ID that was just created
+4. If a step fails, the error is passed back as context so the model can attempt recovery (e.g. a 404 on a GET means the resource doesn't exist and needs to be created)
+5. When the goal is achieved, the model responds with `action: "done"` and a plain-English summary
 
 The agent handles up to 12 steps and stops after 3 consecutive failures.
 
@@ -174,6 +176,8 @@ User settings are available via the gear icon in the top-right corner and are pe
 |---------|-------------|
 | **Require confirmation** | When enabled, shows an approval prompt before running any command. When disabled, read and modify commands auto-execute. Destructive commands (DELETE, purge) always require explicit typed confirmation regardless of this setting. |
 | **Default resource group** | Pre-fills the `{resourceGroup}` placeholder in all Azure REST API calls. Useful when most of your work targets a single resource group. |
+| **LLM provider** | Choose whether Anthropic Claude or OpenAI ChatGPT powers command generation, synthesis, and the agent loop. |
+| **Model** | Select a curated model from the chosen provider (provider-specific dropdown). |
 
 ## Security Notes
 

@@ -1,10 +1,16 @@
 import { useState, useCallback } from 'react';
+import {
+  DEFAULT_LLM_MODEL_BY_PROVIDER,
+  DEFAULT_LLM_PROVIDER,
+} from '../../../shared/types';
 import { UserSettings } from '../../../shared/types';
 import { getSettings, updateSettings } from '../services/api';
 
 const DEFAULT_SETTINGS: UserSettings = {
   requireConfirmation: false,
   defaultResourceGroup: '',
+  llmProvider: DEFAULT_LLM_PROVIDER,
+  llmModel: DEFAULT_LLM_MODEL_BY_PROVIDER[DEFAULT_LLM_PROVIDER],
 };
 
 export function useSettings() {

@@ -4,6 +4,20 @@ export interface ChatMessage {
   timestamp: number;
 }
 
+export type LlmProvider = 'claude' | 'openai';
+
+export const DEFAULT_LLM_PROVIDER: LlmProvider = 'claude';
+
+export const LLM_PROVIDER_MODELS: Record<LlmProvider, readonly string[]> = {
+  claude: ['claude-sonnet-4-6', 'claude-3-7-sonnet-latest'],
+  openai: ['gpt-5.1', 'gpt-5-mini'],
+};
+
+export const DEFAULT_LLM_MODEL_BY_PROVIDER: Record<LlmProvider, string> = {
+  claude: 'claude-sonnet-4-6',
+  openai: 'gpt-5.1',
+};
+
 export interface GeneratedCommand {
   command: string;
   description: string;
@@ -68,4 +82,6 @@ export interface SessionState {
 export interface UserSettings {
   requireConfirmation: boolean;
   defaultResourceGroup: string;
+  llmProvider: LlmProvider;
+  llmModel: string;
 }
