@@ -25,6 +25,40 @@ A natural language interface for managing Azure resources. Describe what you wan
 - **Destructive command protection** — delete/purge operations always require explicit typed confirmation
 - **Your identity, your permissions** — the backend never injects its own credentials; all API calls use your delegated access token
 
+## In Action
+
+Same app, three execution modes.
+
+### Direct Query
+
+Single API call, immediate raw result for targeted lookups.
+
+**Prompt:** `show me all virtual machines in my webservers resource group`
+
+![Direct query screenshot](docs/images/direct-query.png)
+
+**What's happening:** The app maps intent to one Azure Management REST GET and returns the response directly.
+
+### Synthesized Query
+
+Aggregates API output into a plain-English answer while preserving access to raw data.
+
+**Prompt:** `how many resource groups do I have and which regions are they in?`
+
+![Synthesized query screenshot](docs/images/synthesized-query.png)
+
+**What's happening:** The app executes the query, then streams a conversational summary from the selected model.
+
+### Agent Execution (VM Provisioning)
+
+Multi-step orchestration for dependent resources when one request requires ordered creation.
+
+**Prompt:** `create an Ubuntu VM named WEB1 in the webservers resource group`
+
+![Agent VM execution screenshot](docs/images/agent-vm-execution.png)
+
+**What's happening:** The agent plans and executes dependencies in sequence: **VNet/Subnet → NIC → VM**.
+
 ## Architecture
 
 ```
