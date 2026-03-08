@@ -1,6 +1,6 @@
 # CloudShell LLM
 
-A natural language interface for managing Azure resources. Describe what you want to do in plain English — no commands, no syntax, no CLI knowledge required. The app translates your intent into Azure Management REST API calls, executes them using your own Azure identity, and returns conversational results.
+A natural language interface for managing Azure resources. Describe what you want to do in plain English; no commands, no syntax, no CLI knowledge required. The app translates your intent into Azure Management REST API calls, executes them using your own Azure identity, and returns conversational results.
 
 ![CloudShell LLM](https://img.shields.io/badge/Azure-Management_API-0078d4?style=flat&logo=microsoftazure) ![Anthropic Claude](https://img.shields.io/badge/Anthropic-Claude-191919?style=flat) ![OpenAI ChatGPT](https://img.shields.io/badge/OpenAI-ChatGPT-10a37f?style=flat&logo=openai&logoColor=white) ![React](https://img.shields.io/badge/React-TypeScript-61dafb?style=flat&logo=react)
 
@@ -49,7 +49,7 @@ Aggregates API output into a plain-English answer while preserving access to raw
 
 **What's happening:** The app executes the query, then streams a conversational summary from the selected model.
 
-### Agent Execution (VM Provisioning)
+### Agent Execution
 
 Multi-step orchestration for dependent resources when one request requires ordered creation.
 
