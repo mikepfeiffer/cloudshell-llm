@@ -6,7 +6,7 @@ export interface ChatMessage {
 
 export type LlmProvider = 'claude' | 'openai';
 
-export const DEFAULT_LLM_PROVIDER: LlmProvider = 'claude';
+export const DEFAULT_LLM_PROVIDER: LlmProvider = 'openai';
 
 export const LLM_PROVIDER_MODELS: Record<LlmProvider, readonly string[]> = {
   claude: ['claude-sonnet-4-6', 'claude-3-7-sonnet-latest'],

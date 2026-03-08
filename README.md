@@ -87,7 +87,7 @@ The backend is a thin proxy — it validates your Entra ID token on every reques
 | Frontend | React 18, TypeScript, Vite, Tailwind CSS |
 | Auth | MSAL.js v2 (`@azure/msal-browser`) |
 | Backend | Node.js, Express, TypeScript |
-| LLM | Anthropic Claude or OpenAI ChatGPT (user-selectable per settings) |
+| LLM | OpenAI ChatGPT (default) or Anthropic Claude (user-selectable per settings) |
 | Azure API | Azure Management REST API (`management.azure.com`) |
 
 ## Prerequisites
@@ -212,8 +212,10 @@ User settings are available via the gear icon in the top-right corner and are pe
 |---------|-------------|
 | **Require confirmation** | When enabled, shows an approval prompt before running any command. When disabled, read and modify commands auto-execute. Destructive commands (DELETE, purge) always require explicit typed confirmation regardless of this setting. |
 | **Default resource group** | Pre-fills the `{resourceGroup}` placeholder in all Azure REST API calls. Useful when most of your work targets a single resource group. |
-| **LLM provider** | Choose whether Anthropic Claude or OpenAI ChatGPT powers command generation, synthesis, and the agent loop. |
+| **LLM provider** | Choose whether OpenAI ChatGPT (default) or Anthropic Claude powers command generation, synthesis, and the agent loop. |
 | **Model** | Select a curated model from the chosen provider (provider-specific dropdown). |
+
+Default rationale: ChatGPT is the default because it has been faster and more responsive in interactive testing for this app's chat and agent loops.
 
 ## Security Notes
 
@@ -228,3 +230,5 @@ User settings are available via the gear icon in the top-right corner and are pe
 This project is released under the [MIT License](./LICENSE).
 
 It is provided for educational and development use, without warranty of any kind, and should be validated and security-reviewed before production use.
+
+This project was developed with AI-assisted coding tools, primarily OpenAI Codex and ChatGPT.
