@@ -68,5 +68,4 @@ export interface SessionState {
 export interface UserSettings {
   requireConfirmation: boolean;
   defaultResourceGroup: string;
-  alwaysSynthesize: boolean;
 }

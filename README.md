@@ -128,11 +128,10 @@ cloudshell-llm/
 │       ├── hooks/
 │       │   ├── useAuth.ts       # MSAL authentication
 │       │   ├── useChat.ts       # Chat history + agent/synthesis stream handling
-│       │   └── useCloudShell.ts # Azure REST API execution
-│       ├── services/
-│       │   └── api.ts           # HTTP + SSE client (agent stream, synthesis stream)
-│       └── config/
-│           └── appConfig.ts     # Static config (confirmation toggle)
+│       │   ├── useCloudShell.ts # Azure REST API execution
+│       │   └── useSettings.ts   # User settings (load/save)
+│       └── services/
+│           └── api.ts           # HTTP + SSE client (agent stream, synthesis stream)
 │
 ├── server/                      # Node.js backend
 │   └── src/
@@ -142,12 +141,14 @@ cloudshell-llm/
 │       ├── routes/
 │       │   ├── agent.ts         # POST /api/agent/run (SSE)
 │       │   ├── chat.ts          # POST /api/chat, POST /api/chat/synthesize (SSE)
+│       │   ├── settings.ts      # GET/POST /api/settings
 │       │   └── shell.ts         # POST /api/shell/execute, /poll, etc.
 │       └── services/
 │           ├── agent.ts         # Agentic loop (async generator)
 │           ├── cloudShell.ts    # Azure REST API client + async polling
 │           ├── llm.ts           # Claude integration + streaming synthesis
-│           └── sessionStore.ts  # In-memory session state per user
+│           ├── sessionStore.ts  # In-memory session state per user
+│           └── settingsStore.ts # Per-user settings persistence (JSON file)
 │
 └── shared/
     └── types.ts                 # Shared TypeScript interfaces
@@ -167,15 +168,12 @@ The agent handles up to 12 steps and stops after 3 consecutive failures.
 
 ## Configuration
 
-`client/src/config/appConfig.ts` contains a static configuration flag:
+User settings are available via the gear icon in the top-right corner and are persisted per Entra ID user in `server/data/settings.json` (excluded from source control).
 
-```typescript
-export const appConfig = {
-  requireConfirmation: false, // set true to show approval UI for all commands
-};
-```
-
-When `requireConfirmation` is `false`, read and modify commands auto-execute. Destructive commands (DELETE, purge) always require explicit typed confirmation regardless of this setting.
+| Setting | Description |
+|---------|-------------|
+| **Require confirmation** | When enabled, shows an approval prompt before running any command. When disabled, read and modify commands auto-execute. Destructive commands (DELETE, purge) always require explicit typed confirmation regardless of this setting. |
+| **Default resource group** | Pre-fills the `{resourceGroup}` placeholder in all Azure REST API calls. Useful when most of your work targets a single resource group. |
 
 ## Security Notes
 

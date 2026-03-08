@@ -5,7 +5,6 @@ import { getSettings, updateSettings } from '../services/api';
 const DEFAULT_SETTINGS: UserSettings = {
   requireConfirmation: false,
   defaultResourceGroup: '',
-  alwaysSynthesize: false,
 };
 
 export function useSettings() {

@@ -76,26 +76,6 @@ export function SettingsMenu({ settings, onSave }: Props) {
               </button>
             </label>
 
-            {/* Always synthesize */}
-            <label className="flex items-start justify-between gap-4 cursor-pointer group">
-              <div>
-                <p className="text-slate-200 text-sm font-medium">Always summarize responses</p>
-                <p className="text-slate-500 text-xs mt-0.5">Return a conversational summary for all queries, not just aggregation questions.</p>
-              </div>
-              <button
-                role="switch"
-                aria-checked={draft.alwaysSynthesize}
-                onClick={() => setDraft((d) => ({ ...d, alwaysSynthesize: !d.alwaysSynthesize }))}
-                className={`shrink-0 mt-0.5 w-9 h-5 rounded-full transition-colors ${
-                  draft.alwaysSynthesize ? 'bg-blue-500' : 'bg-slate-700'
-                }`}
-              >
-                <span className={`block w-3.5 h-3.5 bg-white rounded-full shadow transition-transform mx-0.5 ${
-                  draft.alwaysSynthesize ? 'translate-x-4' : 'translate-x-0'
-                }`} />
-              </button>
-            </label>
-
             {/* Default resource group */}
             <div className="space-y-1.5">
               <label className="text-slate-200 text-sm font-medium block">Default resource group</label>

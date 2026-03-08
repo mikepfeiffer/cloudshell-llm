@@ -7,13 +7,11 @@ const SETTINGS_FILE =
 export interface UserSettings {
   requireConfirmation: boolean;
   defaultResourceGroup: string;
-  alwaysSynthesize: boolean;
 }
 
 export const DEFAULT_SETTINGS: UserSettings = {
   requireConfirmation: false,
   defaultResourceGroup: '',
-  alwaysSynthesize: false,
 };
 
 function loadAll(): Record<string, UserSettings> {

@@ -97,7 +97,7 @@ export default function App() {
     if (!entry.pendingCommand) return;
     setExecutingId(entry.id);
     const { rest_method, rest_url, rest_body, command, description } = entry.pendingCommand;
-    const synthesize = entry.pendingCommand.synthesize || settings.alwaysSynthesize;
+    const synthesize = entry.pendingCommand.synthesize;
 
     try {
       const { output, pollUrl } = await execute(rest_method, rest_url, rest_body);
