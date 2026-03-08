@@ -35,7 +35,7 @@ Single API call, immediate raw result for targeted lookups.
 
 **Prompt:** `show me all virtual machines in my webservers resource group`
 
-![Direct query screenshot](docs/images/direct-query.png)
+<img src="https://github.com/user-attachments/assets/ef6975cc-f815-453f-ad1c-dc413b03b528" alt="Direct query screenshot" width="600">
 
 **What's happening:** The app maps intent to one Azure Management REST GET and returns the response directly.
 
@@ -45,7 +45,7 @@ Aggregates API output into a plain-English answer while preserving access to raw
 
 **Prompt:** `how many resource groups do I have and which regions are they in?`
 
-![Synthesized query screenshot](docs/images/synthesized-query.png)
+<img src="https://github.com/user-attachments/assets/9c2b090c-72b2-40c6-b695-695e9eba9e70" alt="Synthesized query screenshot" width="600">
 
 **What's happening:** The app executes the query, then streams a conversational summary from the selected model.
 
@@ -55,7 +55,9 @@ Multi-step orchestration for dependent resources when one request requires order
 
 **Prompt:** `create an Ubuntu VM named WEB1 in the webservers resource group`
 
-![Agent VM execution screenshot](docs/images/agent-vm-execution.png)
+<img src="https://github.com/user-attachments/assets/c776e817-ac67-42f3-b9a9-d61c47a8b172" alt="Agent query screenshot 1" width="600">
+
+<img src="https://github.com/user-attachments/assets/75ed40a0-f1e5-4f38-bdfa-211f22fecdf0" alt="Agent query screenshot 2" width="600">
 
 **What's happening:** The agent plans and executes dependencies in sequence: **VNet/Subnet → NIC → VM**.
 
