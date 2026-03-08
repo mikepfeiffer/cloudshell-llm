@@ -4,6 +4,38 @@ import { ProviderConfig, completeText, streamText } from './llmProvider';
 
 const MAX_HISTORY = 15;
 
+function isVmCreationRequest(message: string): boolean {
+  const text = message.toLowerCase();
+  const hasCreateIntent =
+    text.includes('create') || text.includes('deploy') || text.includes('provision') || text.includes('build');
+  const hasVmIntent = text.includes(' vm') || text.includes('virtual machine');
+  return hasCreateIntent && hasVmIntent;
+}
+
+function hasResourceGroupReference(message: string): boolean {
+  const text = message.toLowerCase();
+  return /in\s+(?:the\s+)?[a-z0-9-_]+\s+resource\s+group/.test(text);
+}
+
+function isOverlyGenericGoalClarification(clarification: string): boolean {
+  const text = clarification.toLowerCase();
+  return (
+    text.includes('what is your goal') ||
+    text.includes('goal for this azure session') ||
+    text.includes('which resource group and region') ||
+    text.includes('which resource group') ||
+    text.includes('provide the target resource group') ||
+    text.includes('provide your goal')
+  );
+}
+
+export function shouldForceVmAgent(message: string, clarification?: string): boolean {
+  if (!isVmCreationRequest(message)) return false;
+  if (!hasResourceGroupReference(message)) return false;
+  if (!clarification) return true;
+  return isOverlyGenericGoalClarification(clarification);
+}
+
 function buildSystemPrompt(session: ShellSession | undefined): string {
   const subscription = session?.subscriptionName
     ? `${session.subscriptionName} (${session.subscriptionId})`
@@ -85,6 +117,7 @@ Rules:
 10. For tasks that require creating or configuring multiple interdependent Azure resources (e.g. "create a VM", "deploy an AKS cluster", "set up a web app with a database"), respond with:
     { "type": "agent", "goal": "<restate the user's goal clearly and completely>", "description": "<one sentence: what the agent will do>" }
     The agent will check prerequisites, create each resource in the correct dependency order, and wait for each to fully provision before proceeding. Use this any time the correct sequence of steps depends on what already exists in the environment.
+    For explicit VM creation goals that already include VM name and resource group, do not ask generic clarifications — return type "agent".
 
 Current session context:
 - Active subscription: ${subscription}
@@ -119,6 +152,15 @@ export async function generateCommand(
     const parsed = JSON.parse(jsonMatch[1] ?? jsonMatch[0]) as Record<string, unknown>;
 
     if ('clarification' in parsed) {
+      const clarification = parsed.clarification as string;
+      // For explicit VM build requests, generic "what is your goal?" clarifications are noise.
+      if (isVmCreationRequest(message) && isOverlyGenericGoalClarification(clarification)) {
+        return {
+          type: 'agent',
+          goal: message,
+          description: 'This agent will create the VM and required dependencies in the correct order.',
+        };
+      }
       return { clarification: parsed.clarification as string };
     }
 

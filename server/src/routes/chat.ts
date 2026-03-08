@@ -1,6 +1,6 @@
 import { Router, Response } from 'express';
 import { AuthenticatedRequest } from '../types/index';
-import { generateCommand, streamSynthesisTokens } from '../services/llm';
+import { generateCommand, shouldForceVmAgent, streamSynthesisTokens } from '../services/llm';
 import { getSession } from '../services/sessionStore';
 import { chatRateLimit } from '../middleware/rateLimit';
 import { ChatMessage } from '../../../shared/types';
@@ -26,9 +26,21 @@ router.post('/', chatRateLimit, async (req: AuthenticatedRequest, res: Response)
     const result = await generateCommand(message, history, session ?? undefined, providerConfig);
 
     if ('clarification' in result) {
+      // Extra guardrail: for explicit VM creation goals with resource group context,
+      // do not bounce back with a generic "what is your goal?" clarification.
+      if (shouldForceVmAgent(message, result.clarification)) {
+        res.json({
+          type: 'agent',
+          goal: message,
+          description: 'This agent will create the VM and required dependencies in the correct order.',
+        });
+        return;
+      }
       res.json({ type: 'clarification', message: result.clarification });
     } else if ('type' in result && result.type === 'agent') {
-      res.json({ type: 'agent', goal: result.goal, description: result.description });
+      // Use the user's original message as the canonical goal so agent defaulting
+      // always has full intent details (VM name, RG, auth, SKU, etc.).
+      res.json({ type: 'agent', goal: message, description: result.description });
     } else if ('type' in result && result.type === 'plan') {
       res.json({
         type: 'plan',
